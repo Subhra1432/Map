@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ENVIRO · NEXUS</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --c1:#00f5ff;--c2:#7b2fff;--c3:#ff0080;--c4:#00ff88;
+  --bg:#050a0f;--bg2:#080e17;--panel:#0a1628;
+  --glass:rgba(0,245,255,0.04);--glass2:rgba(123,47,255,0.06);
+  --border:rgba(0,245,255,0.15);--border2:rgba(123,47,255,0.2);
+  --text:#c8e8f0;--muted:rgba(200,232,240,0.5);
+}
+html,body{height:100%;overflow-x:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;color:var(--text)}
+
+/* ─── LOADER ─── */
+#loader{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .6s ease}
+#loader.hide{opacity:0;pointer-events:none}
+.loader-ring{width:80px;height:80px;border:2px solid transparent;border-top-color:var(--c1);border-right-color:var(--c2);border-radius:50%;animation:spin 1s linear infinite;box-shadow:0 0 20px rgba(0,245,255,.3),inset 0 0 20px rgba(123,47,255,.1)}
+.loader-text{font-family:'Orbitron',monospace;font-size:12px;letter-spacing:.3em;color:var(--c1);margin-top:20px;animation:pulse 1.5s ease-in-out infinite;text-shadow:0 0 10px var(--c1)}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
+
+/* ─── PARTICLE BG ─── */
+#particles{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.particle{position:absolute;border-radius:50%;animation:float linear infinite}
+@keyframes float{0%{transform:translateY(100vh) scale(0);opacity:0}10%{opacity:1}90%{opacity:.3}100%{transform:translateY(-20px) scale(1);opacity:0}}
+
+/* ─── GRID OVERLAY ─── */
+#grid-bg{position:fixed;inset:0;pointer-events:none;z-index:0;background-image:linear-gradient(rgba(0,245,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,245,255,.03) 1px,transparent 1px);background-size:40px 40px;animation:gridPulse 4s ease-in-out infinite}
+@keyframes gridPulse{0%,100%{opacity:.6}50%{opacity:1}}
+
+/* ─── SCAN LINE ─── */
+#scanline{position:fixed;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--c1),transparent);z-index:1;animation:scan 6s linear infinite;box-shadow:0 0 8px var(--c1)}
+@keyframes scan{0%{top:-2px;opacity:0}5%{opacity:.6}95%{opacity:.3}100%{top:100vh;opacity:0}}
+
+/* ─── NAVBAR ─── */
+nav{position:relative;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:58px;background:rgba(5,10,15,.85);border-bottom:1px solid var(--border);backdrop-filter:blur(20px)}
+.nav-logo{font-family:'Orbitron',monospace;font-size:16px;font-weight:700;color:var(--c1);letter-spacing:.15em;text-shadow:0 0 12px var(--c1),0 0 30px rgba(0,245,255,.3)}
+.nav-logo span{color:var(--c2)}
+.nav-badge{background:rgba(0,245,255,.1);border:1px solid var(--border);border-radius:4px;padding:3px 10px;font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--c1)}
+.nav-status{display:flex;gap:16px;align-items:center}
+.status-dot{width:6px;height:6px;border-radius:50%;background:var(--c4);box-shadow:0 0 8px var(--c4);animation:blink 2s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.status-text{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:.08em}
+
+/* ─── MAIN LAYOUT ─── */
+.main-layout{position:relative;z-index:1;display:grid;grid-template-columns:1fr 220px;grid-template-rows:1fr;height:calc(100vh - 58px - 130px);min-height:400px}
+@media(max-width:768px){.main-layout{grid-template-columns:1fr;grid-template-rows:55vh auto}}
+
+/* ─── MAP WRAPPER ─── */
+#map-wrap{position:relative;overflow:hidden}
+#map{width:100%;height:100%;z-index:1}
+.map-overlay{position:absolute;inset:0;pointer-events:none;z-index:2}
+.map-vignette{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 40%,rgba(5,10,15,.7) 100%)}
+.map-border-top{position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--c1),var(--c2),var(--c1),transparent)}
+.map-corner{position:absolute;width:24px;height:24px;border-color:var(--c1);border-style:solid}
+.map-corner.tl{top:12px;left:12px;border-width:2px 0 0 2px}
+.map-corner.tr{top:12px;right:12px;border-width:2px 2px 0 0}
+.map-corner.bl{bottom:12px;left:12px;border-width:0 0 2px 2px}
+.map-corner.br{bottom:12px;right:12px;border-width:0 2px 2px 0}
+.map-hud{position:absolute;top:14px;left:50%;transform:translateX(-50%);pointer-events:none;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:.2em;color:var(--c1);opacity:.6;text-shadow:0 0 8px var(--c1)}
+
+/* ─── ZOOM CONTROLS ─── */
+.zoom-controls{position:absolute;bottom:28px;left:20px;display:flex;flex-direction:column;gap:8px;z-index:3}
+.zoom-btn{width:38px;height:38px;border-radius:50%;border:1px solid var(--c1);background:rgba(0,245,255,.08);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--c1);font-size:20px;font-weight:300;transition:all .25s ease;backdrop-filter:blur(10px);box-shadow:0 0 10px rgba(0,245,255,.2),inset 0 0 10px rgba(0,245,255,.05);line-height:1;font-family:'Orbitron',monospace;user-select:none}
+.zoom-btn:hover{background:rgba(0,245,255,.18);box-shadow:0 0 20px rgba(0,245,255,.4),inset 0 0 15px rgba(0,245,255,.1);transform:scale(1.08)}
+.zoom-btn:active{transform:scale(.94)}
+
+/* ─── COORDINATES DISPLAY ─── */
+.coord-display{position:absolute;bottom:28px;right:20px;font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--c1);opacity:.5;z-index:3;text-align:right;line-height:1.6}
+
+/* ─── SENSOR SIDEBAR ─── */
+.sensor-panel{background:rgba(8,14,23,.9);border-left:1px solid var(--border2);display:flex;flex-direction:column;gap:0;padding:14px 12px;overflow-y:auto;backdrop-filter:blur(20px)}
+.sensor-panel::-webkit-scrollbar{width:3px}
+.sensor-panel::-webkit-scrollbar-track{background:transparent}
+.sensor-panel::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.panel-header{font-family:'Orbitron',monospace;font-size:8px;letter-spacing:.25em;color:var(--muted);text-align:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.sensor-btn{position:relative;background:var(--glass2);border:1px solid var(--border2);border-radius:8px;padding:14px 12px;margin-bottom:10px;cursor:pointer;transition:all .3s ease;overflow:hidden;display:flex;align-items:center;gap:10px}
+.sensor-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(123,47,255,.1),transparent);opacity:0;transition:opacity .3s}
+.sensor-btn::after{content:'';position:absolute;top:0;left:-100%;width:60%;height:100%;background:linear-gradient(90deg,transparent,rgba(123,47,255,.15),transparent);transition:left .5s ease}
+.sensor-btn:hover::before{opacity:1}
+.sensor-btn:hover::after{left:150%}
+.sensor-btn:hover{border-color:var(--c2);box-shadow:0 0 20px rgba(123,47,255,.3),inset 0 0 20px rgba(123,47,255,.05);transform:translateX(-2px)}
+.sensor-btn.cyan-accent:hover{border-color:var(--c1);box-shadow:0 0 20px rgba(0,245,255,.3),inset 0 0 20px rgba(0,245,255,.05)}
+.sensor-btn.green-accent:hover{border-color:var(--c4);box-shadow:0 0 20px rgba(0,255,136,.3),inset 0 0 20px rgba(0,255,136,.05)}
+.sensor-btn.pink-accent:hover{border-color:var(--c3);box-shadow:0 0 20px rgba(255,0,128,.3),inset 0 0 20px rgba(255,0,128,.05)}
+.sensor-icon{width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;position:relative}
+.icon-ph{background:rgba(123,47,255,.15);border:1px solid rgba(123,47,255,.3)}
+.icon-o2{background:rgba(0,245,255,.1);border:1px solid rgba(0,245,255,.25)}
+.icon-temp{background:rgba(255,0,128,.12);border:1px solid rgba(255,0,128,.25)}
+.icon-hum{background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.25)}
+.icon-ppcm{background:rgba(123,47,255,.12);border:1px solid rgba(255,200,0,.25)}
+.sensor-info{flex:1;min-width:0}
+.sensor-name{font-family:'Orbitron',monospace;font-size:9px;font-weight:700;letter-spacing:.12em;color:var(--c1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sensor-label{font-family:'Rajdhani',sans-serif;font-size:9px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sensor-value{font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--text);font-weight:600;white-space:nowrap}
+.pulse-ring{position:absolute;top:8px;right:8px;width:6px;height:6px}
+.pulse-ring::before{content:'';position:absolute;inset:0;border-radius:50%;background:var(--c4);animation:sensorPulse 2s ease-in-out infinite}
+.pulse-ring::after{content:'';position:absolute;inset:-3px;border-radius:50%;border:1px solid var(--c4);opacity:0;animation:sensorPulse 2s ease-in-out infinite .3s}
+@keyframes sensorPulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.8);opacity:0}}
+
+@media(max-width:768px){
+  .sensor-panel{flex-direction:row;flex-wrap:wrap;border-left:none;border-top:1px solid var(--border2);padding:10px 8px;gap:6px}
+  .sensor-btn{flex:1;min-width:calc(50% - 3px);margin-bottom:0;padding:10px 8px}
+  .panel-header{display:none}
+}
+
+/* ─── FOOTER CONTACT ─── */
+.contact-section{position:relative;z-index:1;padding:16px 24px;background:rgba(8,14,23,.95);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;min-height:70px}
+.contact-section::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--c1),var(--c2),var(--c1),transparent)}
+.contact-card{display:flex;align-items:center;gap:12px;background:var(--glass);border:1px solid var(--border);border-radius:8px;padding:10px 16px;transition:all .3s}
+.contact-card:hover{border-color:var(--c1);box-shadow:0 0 16px rgba(0,245,255,.15)}
+.contact-icon{width:32px;height:32px;border-radius:6px;background:rgba(0,245,255,.1);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px}
+.contact-detail{display:flex;flex-direction:column}
+.contact-type{font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:.15em;color:var(--muted)}
+.contact-val{font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;color:var(--text)}
+.footer-brand{font-family:'Orbitron',monospace;font-size:10px;letter-spacing:.15em;color:var(--muted);display:flex;align-items:center;gap:8px}
+.footer-brand::before,.footer-brand::after{content:'';flex:1;height:1px;background:var(--border)}
+.footer-sys{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--muted);text-align:right}
+.footer-sys span{color:var(--c4)}
+
+/* ─── LEAFLET OVERRIDES ─── */
+.leaflet-control-zoom,.leaflet-control-attribution{display:none!important}
+.leaflet-container{background:#020509}
+
+/* ─── GLITCH HEADER ANIMATION ─── */
+@keyframes glitch{
+  0%,90%,100%{text-shadow:0 0 12px var(--c1),0 0 30px rgba(0,245,255,.3)}
+  92%{text-shadow:-2px 0 var(--c3),2px 0 var(--c2)}
+  94%{text-shadow:2px 0 var(--c3),-2px 0 var(--c2)}
+  96%{text-shadow:0 0 12px var(--c1),0 0 30px rgba(0,245,255,.3)}
+}
+.nav-logo{animation:glitch 8s infinite}
+</style>
+</head>
+<body>
+
+<div id="loader">
+  <div class="loader-ring"></div>
+  <div class="loader-text">INITIALIZING NEXUS GRID</div>
+</div>
+
+<div id="particles"></div>
+<div id="grid-bg"></div>
+<div id="scanline"></div>
+
+<!-- NAVBAR -->
+<nav>
+  <div class="nav-logo">ENVIRO<span>·</span>NEXUS</div>
+  <div class="nav-badge">v4.7.1 · LIVE</div>
+  <div class="nav-status">
+    <div class="status-dot"></div>
+    <span class="status-text">ALL NODES ACTIVE · 12 SENSORS</span>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<div class="main-layout">
+
+  <!-- MAP -->
+  <div id="map-wrap">
+    <div id="map"></div>
+    <div class="map-overlay">
+      <div class="map-vignette"></div>
+      <div class="map-border-top"></div>
+      <div class="map-corner tl"></div>
+      <div class="map-corner tr"></div>
+      <div class="map-corner bl"></div>
+      <div class="map-corner br"></div>
+      <div class="map-hud">◈ NEXUS ENVIRONMENTAL GRID · REAL-TIME MONITORING</div>
+    </div>
+    <div class="zoom-controls">
+      <button class="zoom-btn" id="zin" title="Zoom In">+</button>
+      <button class="zoom-btn" id="zout" title="Zoom Out">−</button>
+    </div>
+    <div class="coord-display" id="coord">
+      LAT: 12.9716°N<br>LON: 77.5946°E<br>ZOOM: 12
+    </div>
+  </div>
+
+  <!-- SENSOR SIDEBAR -->
+  <div class="sensor-panel">
+    <div class="panel-header">SENSOR NODES</div>
+
+    <!-- PH -->
+    <div class="sensor-btn">
+      <div class="sensor-icon icon-ph">🧪</div>
+      <div class="sensor-info">
+        <div class="sensor-name">PH</div>
+        <div class="sensor-label">Acidity Level</div>
+        <div class="sensor-value">7.42</div>
+      </div>
+      <div class="pulse-ring"></div>
+    </div>
+
+    <!-- O2 -->
+    <div class="sensor-btn cyan-accent">
+      <div class="sensor-icon icon-o2">💧</div>
+      <div class="sensor-info">
+        <div class="sensor-name">O₂</div>
+        <div class="sensor-label">Dissolved O₂</div>
+        <div class="sensor-value">8.1 mg/L</div>
+      </div>
+      <div class="pulse-ring"></div>
+    </div>
+
+    <!-- TEMPERATURE -->
+    <div class="sensor-btn pink-accent">
+      <div class="sensor-icon icon-temp">🌡</div>
+      <div class="sensor-info">
+        <div class="sensor-name">TEMP</div>
+        <div class="sensor-label">Temperature</div>
+        <div class="sensor-value">28.4 °C</div>
+      </div>
+      <div class="pulse-ring"></div>
+    </div>
+
+    <!-- HUMIDITY -->
+    <div class="sensor-btn green-accent">
+      <div class="sensor-icon icon-hum">☁️</div>
+      <div class="sensor-info">
+        <div class="sensor-name">HUMID</div>
+        <div class="sensor-label">Humidity</div>
+        <div class="sensor-value">62.3 %</div>
+      </div>
+      <div class="pulse-ring"></div>
+    </div>
+
+    <!-- PPCM -->
+    <div class="sensor-btn">
+      <div class="sensor-icon icon-ppcm">⚡</div>
+      <div class="sensor-info">
+        <div class="sensor-name">PPCM</div>
+        <div class="sensor-label">Particulates/cm³</div>
+        <div class="sensor-value">124 ppm</div>
+      </div>
+      <div class="pulse-ring"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- CONTACT FOOTER -->
+<div class="contact-section">
+  <div class="contact-card">
+    <div class="contact-icon">📞</div>
+    <div class="contact-detail">
+      <span class="contact-type">CONTACT · VOICE</span>
+      <span class="contact-val">+91 88705 10567</span>
+    </div>
+  </div>
+  <div class="footer-brand">ENVIRO·NEXUS SYSTEM</div>
+  <div class="contact-card">
+    <div class="contact-icon">✉️</div>
+    <div class="contact-detail">
+      <span class="contact-type">CONTACT · MAIL</span>
+      <span class="contact-val">hariprasanna.karthick@gmail.com</span>
+    </div>
+  </div>
+  <div class="footer-sys">SYS UPTIME <span>99.97%</span><br>NODES <span>12 / 12 ACTIVE</span></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+// ─── PARTICLES ───
+(function(){
+  const c=document.getElementById('particles');
+  for(let i=0;i<22;i++){
+    const p=document.createElement('div');
+    p.className='particle';
+    const size=Math.random()*3+1;
+    const hue=Math.random()>.5?'rgba(0,245,255,':'rgba(123,47,255,';
+    p.style.cssText=`width:${size}px;height:${size}px;background:${hue+(.3+Math.random()*.4)});left:${Math.random()*100}%;animation-duration:${8+Math.random()*12}s;animation-delay:${Math.random()*-15}s`;
+    c.appendChild(p);
+  }
+})();
+
+// ─── MAP ───
+const map=L.map('map',{zoomControl:false,attributionControl:false}).setView([12.9716,77.5946],12);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+  maxZoom:19,subdomains:'abcd'
+}).addTo(map);
+
+// Neon marker pulse
+function addMarker(lat,lng,color){
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+    <circle cx="10" cy="10" r="5" fill="${color}" opacity=".9"/>
+    <circle cx="10" cy="10" r="9" fill="none" stroke="${color}" stroke-width="1" opacity=".4"/>
+  </svg>`;
+  const icon=L.divIcon({html:`<div style="filter:drop-shadow(0 0 6px ${color})">${svg}</div>`,iconSize:[20,20],className:''});
+  L.marker([lat,lng],{icon}).addTo(map);
+}
+addMarker(12.9716,77.5946,'#00f5ff');
+addMarker(12.9352,77.6245,'#7b2fff');
+addMarker(13.0068,77.5568,'#00ff88');
+addMarker(12.9980,77.6300,'#ff0080');
+addMarker(12.9550,77.6100,'#00f5ff');
+
+// Zoom buttons
+document.getElementById('zin').onclick=()=>map.zoomIn();
+document.getElementById('zout').onclick=()=>map.zoomOut();
+
+// Coord display
+function updateCoord(){
+  const c=map.getCenter(),z=map.getZoom();
+  document.getElementById('coord').innerHTML=
+    `LAT: ${c.lat.toFixed(4)}°N<br>LON: ${c.lng.toFixed(4)}°E<br>ZOOM: ${z}`;
+}
+map.on('move',updateCoord);
+map.on('zoom',updateCoord);
+
+// ─── LOADER DISMISS ───
+window.addEventListener('load',()=>{
+  setTimeout(()=>document.getElementById('loader').classList.add('hide'),900);
+});
+
+// ─── LIVE SENSOR VALUES ───
+const sensors=[
+  {el:0,base:7.42,range:.5,unit:'',dec:2},
+  {el:1,base:8.1,range:1.2,unit:' mg/L',dec:1},
+  {el:2,base:28.4,range:2,unit:' °C',dec:1},
+  {el:3,base:62.3,range:8,unit:' %',dec:1},
+  {el:4,base:124,range:20,unit:' ppm',dec:0},
+];
+const vals=document.querySelectorAll('.sensor-value');
+setInterval(()=>{
+  sensors.forEach(s=>{
+    const v=s.base+(Math.random()-.5)*s.range;
+    vals[s.el].textContent=v.toFixed(s.dec)+s.unit;
+  });
+},3000);
+</script>
+</body>
+</html>
