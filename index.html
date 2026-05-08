@@ -127,7 +127,7 @@ nav{position:relative;z-index:100;display:flex;align-items:center;justify-conten
 
 /* ─── LEAFLET OVERRIDES ─── */
 .leaflet-control-zoom,.leaflet-control-attribution{display:none!important}
-.leaflet-container{background:#020509}
+.leaflet-container{background:#e8e8e0}
 
 /* ─── GLITCH HEADER ANIMATION ─── */
 @keyframes glitch{
@@ -283,7 +283,7 @@ nav{position:relative;z-index:100;display:flex;align-items:center;justify-conten
 
 // ─── MAP ───
 const map=L.map('map',{zoomControl:false,attributionControl:false}).setView([12.9716,77.5946],12);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{
   maxZoom:19,subdomains:'abcd'
 }).addTo(map);
 
